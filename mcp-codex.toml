@@ -1,0 +1,7 @@
+# 源码运行的 Codex MCP 配置示例，请将 C:\源码目录\析元 替换为实际源码路径。
+# 也可运行 register-mcp.ps1 自动填写当前目录。
+[mcp_servers.model_observatory]
+command = 'C:\源码目录\析元\.venv-mcp\Scripts\python.exe'
+args = ['-X', 'utf8', 'C:\源码目录\析元\run_mcp.py']
+startup_timeout_sec = 15
+tool_timeout_sec = 90
