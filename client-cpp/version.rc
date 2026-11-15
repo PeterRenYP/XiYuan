@@ -1,0 +1,28 @@
+#include <windows.h>
+// 应用图标与资源管理器属性使用用户指定的析元品牌。
+IDI_ICON1 ICON "assets/xiyuan.ico"
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION 1,0,4,0
+PRODUCTVERSION 1,0,4,0
+FILEFLAGSMASK 0x3fL
+FILEFLAGS 0
+FILEOS VOS_NT_WINDOWS32
+FILETYPE VFT_APP
+BEGIN
+ BLOCK "StringFileInfo"
+ BEGIN
+  BLOCK "080404b0"
+  BEGIN
+   // Unicode 转义避免资源编译器按系统代码页误读中文品牌。
+   VALUE "FileDescription", L"\x6790\x5143\0"
+   VALUE "FileVersion", L"1.0.4\0"
+   VALUE "ProductName", L"\x6790\x5143\0"
+   VALUE "ProductVersion", L"1.0.4\0"
+   VALUE "OriginalFilename", L"Xiyuan.exe\0"
+  END
+ END
+ BLOCK "VarFileInfo"
+ BEGIN
+  VALUE "Translation", 0x0804, 1200
+ END
+END

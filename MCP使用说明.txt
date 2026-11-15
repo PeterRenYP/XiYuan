@@ -1,0 +1,89 @@
+析元 1.0.4 MCP 使用说明
+
+一、启动
+1. 安装版内置 Python、模型运行器和独立 Xiyuan-MCP.exe，无需另装 Python 或运行 setup-mcp.ps1。
+2. 启动安装目录中的 Xiyuan.exe，状态栏显示“MCP：可连接”。
+   推荐打开“帮助 → 安装 MCP”，点击“复制安装提示词”，粘贴给 Codex 自动配置并验证连接。提示词自动填写实际安装路径。
+3. 在支持 MCP 的工具中添加 stdio 服务，命令填写安装目录中的 Xiyuan-MCP.exe，无需参数。
+4. 例如 Codex 配置：[mcp_servers.model_observatory]，command = 'D:\实际安装目录\Xiyuan-MCP.exe'，startup_timeout_sec = 20，tool_timeout_sec = 90。每项单独一行；以实际安装目录替换示例。
+5. 如果当前 Codex 会话未出现 observatory_ 开头的工具，重启 Codex 后再使用。
+
+二、连接方式
+MCP 服务入口：run_mcp.py，使用 .venv-mcp/Scripts/python.exe 启动。
+采用标准 MCP 标准输入输出协议。标准输出只承载协议，日志写到标准错误。
+客户端本地控制桥只监听 127.0.0.1，使用随机端口和每次启动独立令牌。
+连接信息位于 %LOCALAPPDATA%/ModelObservatory/mcp，不应把其中的令牌发到对话。
+默认只运行一个客户端时自动连接。多个客户端时先调用 observatory_list_instances，
+再用 observatory_select_instance 明确选择目标。目标退出后不会自动切到另一个窗口。
+需要关闭本地控制桥时，可用 Xiyuan.exe --disable-mcp 启动。
+
+三、推荐操作顺序
+1. observatory_list_instances：发现软件。
+2. observatory_get_state：查看项目、模型、编辑版本和事件游标。
+3. observatory_create_project 或 observatory_open_project：打开项目。
+4. observatory_wait_events：等待 model.ready 和 session.activated，或 request.failed。
+5. 新项目默认没有会话，先调用 observatory_new_session，并等待 session.activated。
+6. observatory_model_info：查看模型能力、维度和算子目录。
+7. observatory_send_message：发送消息，可选 thinking、max_tokens 和 temperature。
+8. observatory_wait_events：等待 run.finished、step.waiting 或 request.failed。
+9. observatory_get_history：读取正式回答及模型实际生成的思考文本。
+MCP 发送消息沿用当前嵌入或独立对话模式，消息、思考和回答沿用 UI 的实时渲染流程。
+观测位置选择同步到界面；应用或清除神经元规则后，干预面板同步显示实际生效规则。
+get_history 的 rendered_text 返回界面实际渲染文字（最多末尾 32768 字符），不是独立生成的回复。
+普通对话与深度思考分别保存温度，模型设置中可以调整。Qwen3.5 的思考默认温度为 1.0，
+top_p=0.95、top_k=20、presence_penalty=1.5；普通对话默认温度 0.7、top_p=0.8。
+思考和回答来自同一次生成，仅按模型输出的思考边界拆分展示。中断的纯思考记录保留显示，
+后续推理不注入历史思考，也不发送正式回答为空的助手消息。思考仍计入生成token上限。
+
+四、数据与神经元
+observatory_show_neurons 打开神经元页面。可传入层号与神经元编号定位；global=true 恢复全局视图，live 控制播放和暂停。需要实时观测时，先打开页面再发送消息。
+observatory_query_view 在界面显示所查位置，并返回真实快照、神经元数值、张量引用和采集状态。
+observatory_select_view 同步切换界面观测位置。显式指定神经元时打开神经元页；运行中切层会改变后续算子采集层。
+observatory_tensor_slice 用张量引用和每个轴的范围读取数值。
+observatory_query_scalar 展示投影输出捕获值及单精度重算内积。
+observatory_get_tokens、observatory_get_telemetry 分别查看token和显卡采样。
+所有层、神经元、token、行列和隐藏维度索引均从零开始。
+
+编辑前重新调用 observatory_get_state，取得 weights_revision 和 model_revision。
+apply_rules、clear_rules、restore_backup 必须同时传入 expected_weights_revision
+和 expected_model_revision，避免在模型切换或版本变化后误改。
+observatory_apply_rules 的 target=temporary 表示临时激活干预，用于后续输入；
+target=model 表示创建备份后写回当前磁盘模型权重。
+临时规则支持 zero 归零、scale 缩放、set 设值、add 加值和 steer 归一化引导。
+权重规则支持 zero、scale、set，projection 可选 gate、up、down。
+observatory_get_rules 查看已应用的临时规则；observatory_clear_rules 清除临时干预。
+observatory_restore_backup 恢复当前模型自己的权重备份。
+observatory_export_model 将当前模型导出到新目录。
+
+五、运行与项目
+observatory_set_mode：normal 对话、observe 观测。模式在发送时固定，运行中改变选择只影响下一条输入。
+observatory_step 及 set_mode 的 step 暂时下线，返回 FEATURE_DISABLED，兼容工具名称保留。
+observatory_cancel：取消生成或模型加载。
+observatory_save_project：空闲时保存；运行中暂停到安全边界并生成恢复点。
+observatory_resume_run 随调试模式暂时下线，已有运行恢复点继续保留。
+observatory_list_sessions、new_session、switch_session：会话管理。允许零会话，发送前必须自行新建。
+observatory_open_trace、export_trace：离线记录查看和导出。
+
+六、异步结果
+accepted=true 只表示命令已提交，不能据此认定加载、生成或编辑成功。
+使用返回的 event_cursor 调用 get_events 或 wait_events，等待最终成功或 request.failed。
+get_events 的 next_cursor 用于继续分页。dropped=true 表示旧事件已被淘汰，应重新读状态。
+wait_events 的 names 为空数组时接收任意事件，最长等待六十秒。
+客户端重启后 instance_id 会改变，应重新选择实例并重新取得游标。
+
+七、验证
+连接层回归：
+  .venv-mcp/Scripts/python.exe -X utf8 -m unittest discover -s tests -p test_mcp.py -v
+完整联调脚本：tests/verify_mcp.py。
+联调必须使用独立测试项目与复制模型，因为测试包含真实权重写入和备份恢复。
+结果文件为测试目录中的 MCP验证.json。
+
+八、配置与移除
+可复制配置见 mcp-codex.toml。迁移项目后请重新运行注册脚本或更新其中的绝对路径。
+移除 Codex 注册：codex mcp remove model_observatory。
+
+九、本次输出与存储规则
+输出上限不再固定为 4096，新项目默认取模型最大额度，后端按实际输入与历史长度限制剩余额度。
+send_message 的 max_tokens 仅影响本次请求，不覆盖 UI 默认值；get_state 返回 max_tokens、max_tokens_limit、running_mode 和 session_count。
+观测采用有界后台写入和批量事务，保存、导出和结束前等待已接纳数据落盘。队列饱和时明确标记采集不完整。
+更新 MCP 服务源码后，现有 MCP 宿主重连服务才能刷新工具说明。
